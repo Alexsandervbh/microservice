@@ -1,0 +1,30 @@
+dmitry@dmitry-gb:~$ export KUBECONFIG=kubernetes-gb_kubeconfig.yaml 
+dmitry@dmitry-gb:~$ kubectl cluster-info 
+Kubernetes control plane is running at https://109.120.190.18:6443
+CoreDNS is running at https://109.120.190.18:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+dmitry@dmitry-gb:~$ kubectl get node
+NAME                               STATUS   ROLES    AGE   VERSION
+kubernetes-gb-kubernetes-group-0   Ready    <none>   61m   v1.21.4
+kubernetes-gb-kubernetes-group-1   Ready    <none>   55m   v1.21.4
+kubernetes-gb-master-0             Ready    master   61m   v1.21.4
+dmitry@dmitry-gb:~$ 
+
+
+dmitry@dmitry-gb:~$ kubectl create ns kubedoom
+namespace/kubedoom created
+
+dmitry@dmitry-gb:~$ kubectl config set-context --current --namespace=kubedoom
+Context "default/kubernetes-gb" modified.
+
+dmitry@dmitry-gb:~$ kubectl get pod
+NAME                                   READY   STATUS    RESTARTS   AGE
+kubedoom-deployment-6d69946486-bv8td   1/1     Running   0          57s
+
+dmitry@dmitry-gb:~$ kubectl port-forward pod/kubedoom-deployment-6d69946486-bv8td 5000:5900
+Forwarding from 127.0.0.1:5000 -> 5900
+Forwarding from [::1]:5000 -> 5900
+Handling connection for 5000
+
+
