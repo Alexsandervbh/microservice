@@ -1,0 +1,119 @@
+altoo@altoo-gb:~/dz4$ export KUBECONFIG=kubernetes-cluster-pg_kubeconfig.yaml
+altoo@altoo-gb:~/dz4$ kubectl cluster-info
+Kubernetes control plane is running at https://146.185.210.7:6443
+CoreDNS is running at https://146.185.210.7:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+altoo@altoo-gb:~/dz4$ kubectl get node
+NAME                                       STATUS   ROLES    AGE   VERSION
+kubernetes-cluster-pg-default-group-pg-0   Ready    <none>   17m   v1.21.4
+kubernetes-cluster-pg-default-group-pg-1   Ready    <none>   12m   v1.21.4
+kubernetes-cluster-pg-master-0             Ready    master   25m   v1.21.4
+altoo@altoo-gb:~/dz4$ 
+
+altoo@altoo-gb:~/dz4$ kubectl create ns pg
+namespace/pg created
+
+altoo@altoo-gb:~/dz4$ kubectl apply -f pvc.yaml
+persistentvolumeclaim/pg-storage created
+
+
+NAME         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS       AGE
+pg-storage   Bound    pvc-e2473645-a209-4d64-a8c2-6cf08a6a6cbf   10Gi       RWX            csi-ceph-hdd-ms1   31s
+altoo@altoo-gb:~/dz4$ 
+
+altoo@altoo-gb:~/dz4$ kubectl create secret generic pg-secret --from-literal=PASS=123
+secret/pg-secret created
+
+altoo@altoo-gb:~/dz4$ kubectl get secret pg-secret
+NAME        TYPE     DATA   AGE
+pg-secret   Opaque   1      25s
+altoo@altoo-gb:~/dz4$ 
+
+altoo@altoo-gb:~/dz4$ kubectl apply -f pg_deploy.yaml 
+deployment.apps/pg-deploy-db created
+altoo@altoo-gb:~/dz4$ kubectl get pod
+NAME                            READY   STATUS    RESTARTS   AGE
+pg-deploy-db-796868cfc9-7kn57   1/1     Running   0          90s
+altoo@altoo-gb:~/dz4$ 
+
+altoo@altoo-gb:~/dz4$ kubectl apply -f pg-test-pod.yaml 
+pod/pg-pod created
+
+altoo@altoo-gb:~/dz4$ kubectl get pod
+NAME                            READY   STATUS    RESTARTS   AGE
+pg-deploy-db-796868cfc9-7kn57   1/1     Running   0          10m10s
+pg-pod                          1/1     Running   0          80s
+altoo@altoo-gb:~/dz4$ 
+
+altoo@altoo-gb:~/dz4$ kubectl get pod -o wide
+NAME                            READY   STATUS    RESTARTS   AGE     IP               NODE                                       NOMINATED NODE   READINESS GATES
+pg-deploy-db-796868cfc9-7kn57   1/1     Running   0          13m     10.100.109.192   kubernetes-cluster-pg-default-group-pg-1   <none>           <none>
+pg-pod                          1/1     Running   0          5m15s   10.100.247.193   kubernetes-cluster-pg-default-group-pg-0   <none>           <none>
+
+kubectl exec -it pg-pod -- bash
+
+
+altoo@altoo-gb:~/dz4$ psql -h 10.100.109.192 -U test testdb
+
+testdb=#
+
+testdb=# CREATE TABLE nameusers (name VARCHAR (255), age INT);
+CREATE TABLE
+testdb=# \dt
+         List of relations
+ Schema |   Name    | Type  | Owner 
+--------+-----------+-------+-------
+ public | nameusers | table | test
+(1 row)
+
+testdb=# INSERT INTO nameusers (name, age) VALUES ('Ivan', 20), ('Sergey', 30);
+INSERT 0 2
+testdb=# SELECT * FROM nameusers;
+  name  | age 
+--------+-----
+ Ivan   |  20
+ Sergey |  30
+(2 rows)
+
+
+altoo@altoo-gb:~/dz4$ kubectl get pod
+NAME                            READY   STATUS    RESTARTS   AGE
+pg-deploy-db-796868cfc9-7kn57   1/1     Running   0          20m
+pg-pod                          1/1     Running   0          8s
+
+altoo@altoo-gb:~/dz4$ kubectl delete pod pg-deploy-db-796868cfc9-7kn57
+pod "pg-deploy-db-796868cfc9-7kn57" deleted
+altoo@altoo-gb:~/dz4$ kubectl get pod
+NAME                            READY   STATUS     RESTARTS   AGE
+pg-deploy-db-796868cfc9-8gtwj   0/1     Init:0/1   0          15s
+pg-pod                          1/1     Running    0          19m
+
+
+altoo@altoo-gb:~/dz4$ kubectl get pod
+NAME                            READY   STATUS    RESTARTS   AGE
+pg-deploy-db-796868cfc9-8gtwj   1/1     Running   0          69s
+pg-pod                          1/1     Running   0          21m
+
+
+altoo@altoo-gb:~/dz4$ kubectl get pod -o wide
+NAME                            READY   STATUS    RESTARTS   AGE     IP               NODE                                       NOMINATED NODE   READINESS GATES
+pg-deploy-db-796868cfc9-8gtwj   1/1     Running   0          6m11s   10.100.247.196   kubernetes-cluster-pg-default-group-pg-0   <none>           <none>
+pg-pod                          1/1     Running   0          23m     10.100.247.195   kubernetes-cluster-pg-default-group-pg-0   <none>           <none>
+altoo@altoo-gb:~/dz4$ kubectl exec -it pg-pod -- bash
+root@pg-pod:/# psql -h 10.100.247.196 -U test testdb
+Password for user test: 
+psql (10.13 (Debian 10.13-1.pgdg90+1))
+Type "help" for help.
+
+testdb=# SELECT * FROM nameusers;
+  name  | age 
+--------+-----
+ Ivan   |  20
+ Sergey |  30
+(2 rows)
+
+testdb=# 
+
+
